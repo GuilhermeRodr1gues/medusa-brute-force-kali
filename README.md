@@ -22,7 +22,7 @@ medusa -h 192.168.56.101 -U user.txt -P pass.txt -M ftp -t 6
 
 Credencial válida encontrada: **msfadmin : msfadmin**
 
-![FTP brute force](images/ataque-linux.png)
+![FTP brute force](images/Ataque-linux.png)
 
 ## Ataque 2: DVWA (web-form)
 
