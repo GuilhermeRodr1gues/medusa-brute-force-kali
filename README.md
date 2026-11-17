@@ -1,60 +1,71 @@
-# Ataques de Força Bruta com Medusa — Kali Linux
+# Brute-Force Attacks with Medusa — Kali Linux
 
-## Objetivo
-Documentar a execução de ataques de força bruta contra um serviço FTP e um formulário web (DVWA), utilizando o Medusa no Kali Linux, em ambiente de laboratório controlado (Metasploitable 2), com o objetivo de entender o funcionamento desses ataques e propor medidas de mitigação.
+> ⚠️ **Disclaimer:** This project was conducted entirely in a **private, isolated lab environment** (Kali Linux and Metasploitable 2 in VirtualBox). No real or third-party systems were targeted.
 
-## Ambiente
-- **Atacante:** Kali Linux (VirtualBox)
-- **Alvo:** Metasploitable 2 (VirtualBox) — IP `192.168.56.101`
-- **Rede:** Host-Only (`192.168.56.0/24`) para isolar o laboratório do Kali e do Metasploitable, com um adaptador NAT adicional no Kali apenas para acesso à internet (clone do repositório, atualizações, etc).
+## Objective
 
-## Ataque 1: FTP
+Document the execution of **brute-force attacks** against an **FTP service** and a **web-form login** (DVWA), using **Medusa** on **Kali Linux**, in a controlled lab environment (**Metasploitable 2**), with the goal of understanding how these attacks work and proposing mitigation measures.
 
-**Comando:**
+## Environment
 
+- **Attacker:** Kali Linux (VirtualBox)
+- **Target:** Metasploitable 2 (VirtualBox) — IP `192.168.56.101`
+- **Network:** Host-only (`192.168.56.0/24`) to isolate the lab between Kali and Metasploitable, with an additional NAT adapter on Kali for internet access only (cloning the repository, updates, etc.)
+
+## Attack 1: FTP
+
+**Command:**
+
+```bash
 medusa -h 192.168.56.101 -U user.txt -P pass.txt -M ftp -t 6
+```
 
+**Result:**
 
-**Resultado:**
-
+```
 2026-11-07 12:08:22 ACCOUNT FOUND: [ftp] Host: 192.168.56.101 User: msfadmin Password: msfadmin [SUCCESS]
+```
 
-
-Credencial válida encontrada: **msfadmin : msfadmin**
+Valid credential found: **msfadmin : msfadmin**
 
 ![FTP brute force](images/Ataque-linux.png)
 
-## Ataque 2: DVWA (web-form)
+## Attack 2: DVWA (web-form)
 
-**Comando utilizado:**
+**Command used:**
 
-medusa -h 192.168.56.101 -U user.txt -P pass.txt -M http
--m PAGE:”/dvwa/login.php”
--m FORM:“username^USER^&password=^PASS^&Login=Login”
--m “FAIL=Login failed” -t 6
+```bash
+medusa -h 192.168.56.101 -U user.txt -P pass.txt -M http \
+  -m PAGE:"/dvwa/login.php" \
+  -m FORM:"username^USER^&password=^PASS^&Login=Login" \
+  -m "FAIL=Login failed" -t 6
+```
 
+**Result and key observation:**
 
-**Resultado e observação importante:**
-A saída apresentou diversos avisos `WARNING: Invalid method: PAGE`, `FORM`, `FAIL=Login failed`. A causa raiz foi identificada: o comando utilizou o módulo **`-M http`** (autenticação HTTP básica), mas os parâmetros `-m PAGE:`, `-m FORM:` e `-m FAIL=` só são reconhecidos pelo módulo **`-M web-form`**, usado especificamente para ataques em formulários de login como o do DVWA. Por não reconhecer esses parâmetros, o Medusa não conseguiu validar corretamente login x senha, e reportou **todas** as combinações testadas como `[SUCCESS]` — um falso positivo da ferramenta, não um resultado real de comprometimento.
+The output showed several `WARNING: Invalid method: PAGE`, `FORM`, `FAIL=Login failed` messages. The root cause was identified: the command used the **`-M http`** module (**HTTP Basic authentication**), but the `-m PAGE:`, `-m FORM:`, and `-m FAIL=` parameters are only recognized by the **`-M web-form`** module, used specifically for login forms like DVWA's. Because it didn't recognize these parameters, Medusa couldn't properly validate the username/password pairs, and reported **every** tested combination as `[SUCCESS]` — a **false positive** from the tool, not a real compromise.
 
-**Comando correto para uma próxima execução:**
+**Correct command for a future run:**
 
-medusa -h 192.168.56.101 -U user.txt -P pass.txt -M web-form
--m PAGE:”/dvwa/login.php”
--m FORM:“username^USER^&password=^PASS^&Login=Login”
--m “FAIL=Login failed” -t 6
+```bash
+medusa -h 192.168.56.101 -U user.txt -P pass.txt -M web-form \
+  -m PAGE:"/dvwa/login.php" \
+  -m FORM:"username^USER^&password=^PASS^&Login=Login" \
+  -m "FAIL=Login failed" -t 6
+```
 
-
-**Aprendizado:** este episódio reforça dois pontos importantes: (1) a importância de validar manualmente qualquer credencial "encontrada" por uma ferramenta automatizada antes de considerá-la confiável, e (2) a necessidade de escolher o módulo correto do Medusa para cada tipo de serviço — `web-form` para formulários HTML, e não `http` (que é para autenticação HTTP Basic/Digest).
+**Lesson learned:** this episode reinforces two important points: (1) the importance of manually validating any credential "found" by an automated tool before trusting it, and (2) the need to choose the correct Medusa module for each service type — **`web-form`** for HTML forms, not **`http`** (which is for HTTP Basic/Digest authentication).
 
 ![DVWA brute force](images/ataque-web.png)
 
-## Mitigações recomendadas
-- **FTP:** desabilitar contas padrão/fracas (como `msfadmin`), aplicar política de senhas fortes, limitar tentativas de login e usar bloqueio temporário após falhas repetidas (ex: fail2ban).
-- **DVWA / formulários web:** implementar CAPTCHA, limitar tentativas por IP, usar autenticação multifator (MFA) e registrar/alertar tentativas de login suspeitas.
-- **Geral:** monitorar logs de autenticação e segmentar a rede para reduzir a superfície de ataque.
+## Recommended mitigations
 
-## Aprendizados
-- Configuração de laboratório isolado com VirtualBox (rede host-only + NAT para internet).
-- Uso prático do Medusa para ataques de força bruta em FTP.
-- Identificação e diagnóstico de um erro de configuração (módulo `-M http` em vez de `-M web-form`) que gerou falsos positivos ao atacar um formulário web, reforçando a necessidade de validar manualmente os resultados de ferramentas automatizadas.
+- **FTP:** disable default/weak accounts (such as `msfadmin`), enforce a strong password policy, limit login attempts, and use temporary lockouts after repeated failures (e.g., **fail2ban**).
+- **DVWA / web forms:** implement **CAPTCHA**, rate-limit attempts per IP, use **multi-factor authentication (MFA)**, and log/alert on suspicious login attempts.
+- **General:** monitor authentication logs and segment the network to reduce the attack surface.
+
+## What I learned
+
+- Setting up an isolated lab with VirtualBox (host-only network + NAT for internet access).
+- Practical use of **Medusa** for **brute-force attacks** against **FTP**.
+- Identifying and diagnosing a configuration error (**`-M http`** instead of **`-M web-form`**) that caused **false positives** when attacking a web form, reinforcing the need to manually validate the results of automated tools.
